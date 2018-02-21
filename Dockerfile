@@ -1,7 +1,7 @@
 FROM openjdk:8-jdk-alpine
 VOLUME /tmp
 ARG JAR_FILE
-ADD target/awsproxy-0.1.0-SNAPSHOT.jar app.jar
+ADD ${JAR_FILE} app.jar
 
 ENV AWS_ACCESS_KEY_ID ''
 ENV AWS_SECRET_ACCESS_KEY ''
