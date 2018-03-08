@@ -15,6 +15,8 @@ public class Server implements Comparable<Server> {
 	private String environment;
 
 	private String ecosystem;
+	
+	private boolean hasEndpoint;
 
 	public String getEcosystem() {
 		return ecosystem;
@@ -31,8 +33,6 @@ public class Server implements Comparable<Server> {
 	public void setEnvironment(String environment) {
 		this.environment = environment;
 	}
-
-	private boolean hasEndpoint;
 
 	public String getPublicIpAddress() {
 		return publicIpAddress;
@@ -70,7 +70,7 @@ public class Server implements Comparable<Server> {
 	public int compareTo(Server other) {
 		return new CompareToBuilder().append(this.ecosystem, other.ecosystem)
 				.append(this.environment, other.environment).append(this.name, other.name)
-				.append(this.privateIpAddress, other.privateIpAddress).toComparison();
+				.append(this.privateIpAddress, other.privateIpAddress).append(this.publicIpAddress, other.publicIpAddress).append(this.hasEndpoint, other.hasEndpoint).toComparison();
 	}
 
 	@Override

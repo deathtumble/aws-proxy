@@ -1,5 +1,6 @@
 package uk.co.murraytait.awsproxy.aws.impl;
 
+import java.net.UnknownHostException;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -40,7 +41,7 @@ public class Ec2Adaptor implements CloudServerAdaptor, DisposableBean {
 	}
 
 	@Override
-	public SortedSet<Server> servers() {
+	public SortedSet<Server> servers() throws UnknownHostException {
 		SortedSet<Server> servers = new TreeSet<>();
 		boolean done = false;
 
