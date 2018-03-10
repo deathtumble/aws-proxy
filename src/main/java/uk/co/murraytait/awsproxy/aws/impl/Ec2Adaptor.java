@@ -52,9 +52,11 @@ public class Ec2Adaptor implements CloudServerAdaptor, DisposableBean {
 
 			for (Reservation reservation : response.getReservations()) {
 				for (Instance instance : reservation.getInstances()) {
-					Server server = extractServer(instance);
+					if (!instance.getState().getName().equals("terminated")) {
+						Server server = extractServer(instance);
 
-					servers.add(server);
+						servers.add(server);
+					}
 				}
 
 				request.setNextToken(response.getNextToken());
