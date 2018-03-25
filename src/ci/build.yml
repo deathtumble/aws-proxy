@@ -1,0 +1,6 @@
+---
+platform: linux
+
+run:
+  path: aws-proxy/src/ci/build.sh
+  dir: aws-proxy
