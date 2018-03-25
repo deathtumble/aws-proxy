@@ -2,4 +2,4 @@
 
 set -e -u -x
 
-mvn clean verify
+mvn clean install
