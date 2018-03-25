@@ -1,6 +1,7 @@
 package uk.co.murraytait.awsproxy.aws.impl;
 
 import java.net.UnknownHostException;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -15,6 +16,7 @@ import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
 import com.amazonaws.services.ec2.model.DescribeInstancesResult;
 import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.Reservation;
+import com.amazonaws.services.ec2.model.Tag;
 
 import uk.co.murraytait.awsproxy.CloudServerAdaptor;
 import uk.co.murraytait.awsproxy.model.Server;
@@ -87,8 +89,14 @@ public class Ec2Adaptor implements CloudServerAdaptor, DisposableBean {
 	}
 
 	private String getTagValue(Instance instance, String tagKey) {
-		return instance.getTags().stream().filter(tag -> {
+		Optional<Tag> foundTag = instance.getTags().stream().filter(tag -> {
 			return tag.getKey().equals(tagKey);
-		}).findFirst().get().getValue();
+		}).findFirst();
+
+		if (foundTag.isPresent()) {
+			return foundTag.get().getValue();
+		} else {
+			return "";
+		}
 	}
 }
