@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import uk.co.murraytait.awsproxy.CloudServerAdaptor;
 import uk.co.murraytait.awsproxy.CloudServiceAdaptor;
-import uk.co.murraytait.awsproxy.model.ExposedService;
+import uk.co.murraytait.awsproxy.model.ServiceSummary;
 import uk.co.murraytait.awsproxy.model.Server;
 
 @RestController
@@ -45,15 +45,15 @@ public class ServerController {
 	}
 
 	@RequestMapping("/services")
-	public Collection<ExposedService> services() throws UnknownHostException {
+	public Collection<ServiceSummary> services() throws UnknownHostException {
 		int tries = 0;
-		Collection<ExposedService> services = null;
+		Collection<ServiceSummary> services = null;
 
 		while (services == null) {
 			tries++;
 
 			try {
-				services = serviceAdaptor.services();
+				services = serviceAdaptor.serviceSummaries();
 			} catch (UnknownHostException exception) {
 				if (tries > 4) {
 					throw exception;

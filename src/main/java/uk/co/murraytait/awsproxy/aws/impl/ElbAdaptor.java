@@ -4,38 +4,50 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
-import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancing;
-import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClient;
-import com.amazonaws.services.elasticloadbalancing.model.DescribeLoadBalancersRequest;
-import com.amazonaws.services.elasticloadbalancing.model.DescribeLoadBalancersResult;
-import com.amazonaws.services.elasticloadbalancing.model.DescribeTagsRequest;
-import com.amazonaws.services.elasticloadbalancing.model.DescribeTagsResult;
-import com.amazonaws.services.elasticloadbalancing.model.LoadBalancerDescription;
-import com.amazonaws.services.elasticloadbalancing.model.Tag;
-import com.amazonaws.services.elasticloadbalancing.model.TagDescription;
+import com.amazonaws.services.ecs.AmazonECS;
+import com.amazonaws.services.ecs.AmazonECSClientBuilder;
+import com.amazonaws.services.ecs.model.Cluster;
+import com.amazonaws.services.ecs.model.DescribeClustersRequest;
+import com.amazonaws.services.ecs.model.DescribeClustersResult;
+import com.amazonaws.services.ecs.model.DescribeServicesRequest;
+import com.amazonaws.services.ecs.model.Service;
+import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
+import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClient;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTagsRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetHealthRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.Tag;
+import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroup;
+import com.amazonaws.services.elasticloadbalancingv2.model.TargetHealth;
+import com.amazonaws.services.elasticloadbalancingv2.model.TargetHealthDescription;
+import com.amazonaws.services.elasticloadbalancingv2.model.TargetHealthStateEnum;
 
 import uk.co.murraytait.awsproxy.CloudServiceAdaptor;
-import uk.co.murraytait.awsproxy.model.ExposedService;
+import uk.co.murraytait.awsproxy.model.ServiceSummary;
 
 @Component
 public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 
 	private static final String ENVIRONMENT_TAG_KEY = "Environment";
-	private static final String ECOSYSTEM_TAG_KEY = "Ecosystem";
-	private static final String PORT_TAG_KEY = "Port";
-	private static final String PATH_TAG_KEY = "Path";
-	private static final String PROTOCOL_TAG_KEY = "Protocol";
+	private static final String PRODUCT_TAG_KEY = "Product";
+	private static final String NAME_TAG_KEY = "Name";
 
 	private final AmazonElasticLoadBalancing amazonElbClient;
+
+	private final AmazonECS amazonEcsClient;
+
+	private final Function<? super Service, ? extends ServiceSummary> serviceMapper;
 
 	public ElbAdaptor(@Value("${aws.region}") String awsRegion) {
 		super();
@@ -44,6 +56,12 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 
 		amazonElbClient = AmazonElasticLoadBalancingClient.builder().withCredentials(credentialsProvider)
 				.withRegion(awsRegion).build();
+
+		amazonEcsClient = AmazonECSClientBuilder.standard().withCredentials(new DefaultAWSCredentialsProviderChain())
+				.withRegion(awsRegion).build();
+
+		serviceMapper = service -> new ServiceSummary().withName(service.getServiceName())
+				.withDesiredTasks(service.getDesiredCount()).withRunningTasks(service.getRunningCount());
 	}
 
 	public void destroy() throws Exception {
@@ -51,64 +69,68 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 	}
 
 	@Override
-	public Collection<ExposedService> services() throws UnknownHostException {
-		SortedSet<ExposedService> services = new TreeSet<>();
+	public Collection<ServiceSummary> serviceSummaries() throws UnknownHostException {
+		String[] clusterNames = new String[] { "nexus", "consul-leader", "consul-server", "concourse", "monitoring",
+				"chatops", "dashing" };
 
-		DescribeLoadBalancersRequest request = new DescribeLoadBalancersRequest();
+		Map<String, ServiceSummary> serviceSummaryMap = createExposedServices(clusterNames);
 
-		DescribeLoadBalancersResult response = amazonElbClient.describeLoadBalancers(request);
+		List<TargetGroup> targetGroups = getTargetGroups();
 
-		Collection<String> loadBalancerNames = new LinkedList<>();
-		for (LoadBalancerDescription loadBalancer : response.getLoadBalancerDescriptions()) {
-			loadBalancerNames.add(loadBalancer.getLoadBalancerName());
+		for (TargetGroup targetGroup : targetGroups) {
+			List<Tag> tags = amazonElbClient.describeTags(new DescribeTagsRequest().withResourceArns(targetGroup.getTargetGroupArn())).getTagDescriptions().get(0).getTags();
+			
+			String serviceName = getTagValue(tags, NAME_TAG_KEY);
+			ServiceSummary serviceSummary = serviceSummaryMap.get(serviceName);
+
+			serviceSummary.setEnvironment(getTagValue(tags, ENVIRONMENT_TAG_KEY));
+			serviceSummary.setProduct(getTagValue(tags, PRODUCT_TAG_KEY));
+			
+			addTargetGroupsHealth(targetGroup, serviceSummary);
 		}
 
-		DescribeTagsRequest describeTagsRequest = new DescribeTagsRequest();
-		describeTagsRequest.withLoadBalancerNames(loadBalancerNames);
-		DescribeTagsResult describeTagsResult = amazonElbClient.describeTags(describeTagsRequest);
-
-		for (LoadBalancerDescription loadBalancer : response.getLoadBalancerDescriptions()) {
-			TagDescription foundTagDescription = null;
-
-			for (TagDescription tagDescription : describeTagsResult.getTagDescriptions()) {
-				if (tagDescription.getLoadBalancerName().equals(loadBalancer.getLoadBalancerName())) {
-					foundTagDescription = tagDescription;
-				}
-			}
-
-			ExposedService extractExposedService = extractExposedService(loadBalancer, foundTagDescription);
-			if (extractExposedService != null) {
-				services.add(extractExposedService);
-			}
-		}
-
-		return services;
+		return serviceSummaryMap.values();
 	}
 
-	public ExposedService extractExposedService(LoadBalancerDescription loadBalancer, TagDescription tagDescription) {
-		ExposedService service = null;
+	private void addTargetGroupsHealth(TargetGroup targetGroup, ServiceSummary serviceSummary) {
+		List<TargetHealthDescription> targetHealthDescriptions = amazonElbClient.describeTargetHealth(new DescribeTargetHealthRequest()
+				.withTargetGroupArn(targetGroup.getTargetGroupArn())).getTargetHealthDescriptions();
 
-		String port = getTagValue(tagDescription.getTags(), PORT_TAG_KEY);
-		String path = getTagValue(tagDescription.getTags(), PATH_TAG_KEY);
-		String protocol = getTagValue(tagDescription.getTags(), PROTOCOL_TAG_KEY);
-		String environment = getTagValue(tagDescription.getTags(), ENVIRONMENT_TAG_KEY);
-		String ecosystem = getTagValue(tagDescription.getTags(), ECOSYSTEM_TAG_KEY);
+		for (TargetHealthDescription targetHealthDescription : targetHealthDescriptions) {
 
-		if (!protocol.isEmpty()) {
-			service = new ExposedService();
+			TargetHealth targetHealth = targetHealthDescription.getTargetHealth();
 
-			if ("80".equals(port)) {
-				service.setElbUrl(protocol.toLowerCase() + "://" + loadBalancer.getDNSName() + path);
-			} else {
-				service.setElbUrl(protocol.toLowerCase() + "://" + loadBalancer.getDNSName() + ":" + port + path);
+			serviceSummary.incrementTargets();
+			
+			if (TargetHealthStateEnum.Healthy.equals(TargetHealthStateEnum.fromValue(targetHealth.getState()))) {
+				serviceSummary.incrementHealthyTargets();
 			}
+		}
+	}
 
-			service.setName(loadBalancer.getLoadBalancerName());
-			service.setEnvironment(environment);
-			service.setEcosystem(ecosystem);
+	private List<TargetGroup> getTargetGroups() {
+		DescribeTargetGroupsRequest request = new DescribeTargetGroupsRequest();
+		DescribeTargetGroupsResult describeTargetGroups = amazonElbClient.describeTargetGroups(request);
+		List<TargetGroup> targetGroups = describeTargetGroups.getTargetGroups();
+		return targetGroups;
+	}
+
+	private Map<String, ServiceSummary> createExposedServices(String... clusterNames) {
+		List<Service> ecsServices = new LinkedList<>();
+
+		DescribeClustersRequest describeClustersRequest = new DescribeClustersRequest().withClusters(clusterNames);
+		DescribeClustersResult describeClusters = amazonEcsClient.describeClusters(describeClustersRequest);
+		describeClusters.getClusters();
+		for (Cluster cluster : describeClusters.getClusters()) {
+			String clusterName = cluster.getClusterName();
+
+			DescribeServicesRequest request = new DescribeServicesRequest();
+			request.withCluster(clusterName);
+			request.withServices(clusterNames);
+			ecsServices.addAll(amazonEcsClient.describeServices(request).getServices());
 		}
 
-		return service;
+		return ecsServices.stream().map(serviceMapper).collect(Collectors.toMap(ServiceSummary::getName, p -> p));
 	}
 
 	private String getTagValue(List<Tag> tags, String tagKey) {

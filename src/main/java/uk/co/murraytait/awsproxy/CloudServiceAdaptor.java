@@ -4,10 +4,10 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.SortedSet;
 
-import uk.co.murraytait.awsproxy.model.ExposedService;
+import uk.co.murraytait.awsproxy.model.ServiceSummary;
 
 public interface CloudServiceAdaptor {
 
-	Collection<ExposedService> services() throws UnknownHostException;
+	Collection<ServiceSummary> serviceSummaries() throws UnknownHostException;
 
 }

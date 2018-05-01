@@ -58,8 +58,12 @@
           <buildArgs>
             <JAR_FILE>target/${project.build.finalName}.jar</JAR_FILE>
           </buildArgs>
-          <repository>deathtumble/aws-proxy</repository>
-          <tag>${project.version}</tag>
+          <repository>aws-proxy</repository>
+          <tag>${git.commit.id.abbrev}</tag>
+          <imageTags>
+            <imageTag>${project.version}</imageTag>
+            <imageTag>latest</imageTag>
+          </imageTags>
           <useMavenSettingsForAuth>true</useMavenSettingsForAuth>
         </configuration>
         <executions>
@@ -71,6 +75,22 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>pl.project13.maven</groupId>
+        <artifactId>git-commit-id-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>get-the-git-infos</id>
+            <goals>
+              <goal>revision</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <abbrevLength>7</abbrevLength>
+
+        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -87,10 +107,10 @@
       <url>https://repo.spring.io/libs-release</url>
     </pluginRepository>
   </pluginRepositories>
-<distributionManagement>
-   <snapshotRepository>
+  <distributionManagement>
+    <snapshotRepository>
       <id>nexus-snapshots</id>
       <url>http://nexus.urbanfortress.uk/nexus/content/repositories/snapshots</url>
-   </snapshotRepository>
-</distributionManagement>
+    </snapshotRepository>
+  </distributionManagement>
 </project>
