@@ -8,6 +8,6 @@ import uk.co.murraytait.awsproxy.model.ServiceSummary;
 
 public interface CloudServiceAdaptor {
 
-	Collection<ServiceSummary> serviceSummaries() throws UnknownHostException;
+	Collection<ServiceSummary> serviceSummaries(String[] clusterNames) throws UnknownHostException;
 
 }

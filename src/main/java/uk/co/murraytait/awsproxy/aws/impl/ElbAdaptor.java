@@ -69,10 +69,7 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 	}
 
 	@Override
-	public Collection<ServiceSummary> serviceSummaries() throws UnknownHostException {
-		String[] clusterNames = new String[] { "nexus", "consul-leader", "consul-server", "concourse", "monitoring",
-				"chatops", "dashing" };
-
+	public Collection<ServiceSummary> serviceSummaries(String[] clusterNames) throws UnknownHostException {
 		Map<String, ServiceSummary> serviceSummaryMap = createExposedServices(clusterNames);
 
 		List<TargetGroup> targetGroups = getTargetGroups();

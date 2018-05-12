@@ -46,6 +46,9 @@ public class ServerController {
 
 	@RequestMapping("/services")
 	public Collection<ServiceSummary> services() throws UnknownHostException {
+		String[] clusterNames = new String[] { "nexus", "consul-leader", "consul-server", "concourse", "monitoring",
+				"chatops", "dashing" };
+
 		int tries = 0;
 		Collection<ServiceSummary> services = null;
 
@@ -53,7 +56,7 @@ public class ServerController {
 			tries++;
 
 			try {
-				services = serviceAdaptor.serviceSummaries();
+				services = serviceAdaptor.serviceSummaries(clusterNames);
 			} catch (UnknownHostException exception) {
 				if (tries > 4) {
 					throw exception;
