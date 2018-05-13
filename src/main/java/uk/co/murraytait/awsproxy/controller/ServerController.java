@@ -4,12 +4,14 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import uk.co.murraytait.awsproxy.CloudServerAdaptor;
 import uk.co.murraytait.awsproxy.CloudServiceAdaptor;
-import uk.co.murraytait.awsproxy.model.ServiceSummary;
 import uk.co.murraytait.awsproxy.model.Server;
+import uk.co.murraytait.awsproxy.model.ServiceSummary;
 
 @RestController
 public class ServerController {
@@ -44,10 +46,8 @@ public class ServerController {
 		return servers;
 	}
 
-	@RequestMapping("/services")
-	public Collection<ServiceSummary> services() throws UnknownHostException {
-		String[] clusterNames = new String[] { "nexus", "consul-leader", "consul-server", "concourse", "monitoring",
-				"chatops", "dashing" };
+	@RequestMapping(value="/services", method = RequestMethod.GET)
+	public Collection<ServiceSummary> services(@RequestParam(value = "cluster") String[] clusterNames) throws UnknownHostException {
 
 		int tries = 0;
 		Collection<ServiceSummary> services = null;
