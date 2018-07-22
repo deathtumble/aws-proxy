@@ -2,6 +2,7 @@ package uk.co.murraytait.awsproxy.aws.impl;
 
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,10 +17,10 @@ import org.springframework.stereotype.Component;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
-import com.amazonaws.services.ecs.model.Cluster;
-import com.amazonaws.services.ecs.model.DescribeClustersRequest;
-import com.amazonaws.services.ecs.model.DescribeClustersResult;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
+import com.amazonaws.services.ecs.model.ListClustersResult;
+import com.amazonaws.services.ecs.model.ListServicesRequest;
+import com.amazonaws.services.ecs.model.ListServicesResult;
 import com.amazonaws.services.ecs.model.Service;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClient;
@@ -69,36 +70,42 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 	}
 
 	@Override
-	public Collection<ServiceSummary> serviceSummaries(String[] clusterNames) throws UnknownHostException {
-		Map<String, ServiceSummary> serviceSummaryMap = createExposedServices(clusterNames);
+	public Collection<ServiceSummary> serviceSummaries() throws UnknownHostException {
+		Map<String, ServiceSummary> serviceSummaryMap = createExposedServices();
 
 		List<TargetGroup> targetGroups = getTargetGroups();
 
 		for (TargetGroup targetGroup : targetGroups) {
-			List<Tag> tags = amazonElbClient.describeTags(new DescribeTagsRequest().withResourceArns(targetGroup.getTargetGroupArn())).getTagDescriptions().get(0).getTags();
-			
-			String serviceName = getTagValue(tags, NAME_TAG_KEY);
-			ServiceSummary serviceSummary = serviceSummaryMap.get(serviceName);
+			List<Tag> tags = amazonElbClient
+					.describeTags(new DescribeTagsRequest().withResourceArns(targetGroup.getTargetGroupArn()))
+					.getTagDescriptions().get(0).getTags();
 
-			serviceSummary.setEnvironment(getTagValue(tags, ENVIRONMENT_TAG_KEY));
-			serviceSummary.setProduct(getTagValue(tags, PRODUCT_TAG_KEY));
-			
-			addTargetGroupsHealth(targetGroup, serviceSummary);
+			String serviceName = getTagValue(tags, NAME_TAG_KEY);
+			if (serviceSummaryMap.containsKey(serviceName)) {
+				ServiceSummary serviceSummary = serviceSummaryMap.get(serviceName);
+
+				serviceSummary.setEnvironment(getTagValue(tags, ENVIRONMENT_TAG_KEY));
+				serviceSummary.setProduct(getTagValue(tags, PRODUCT_TAG_KEY));
+
+				addTargetGroupsHealth(targetGroup, serviceSummary);
+			}
 		}
 
 		return serviceSummaryMap.values();
 	}
 
 	private void addTargetGroupsHealth(TargetGroup targetGroup, ServiceSummary serviceSummary) {
-		List<TargetHealthDescription> targetHealthDescriptions = amazonElbClient.describeTargetHealth(new DescribeTargetHealthRequest()
-				.withTargetGroupArn(targetGroup.getTargetGroupArn())).getTargetHealthDescriptions();
+		List<TargetHealthDescription> targetHealthDescriptions = amazonElbClient
+				.describeTargetHealth(
+						new DescribeTargetHealthRequest().withTargetGroupArn(targetGroup.getTargetGroupArn()))
+				.getTargetHealthDescriptions();
 
 		for (TargetHealthDescription targetHealthDescription : targetHealthDescriptions) {
 
 			TargetHealth targetHealth = targetHealthDescription.getTargetHealth();
 
 			serviceSummary.incrementTargets();
-			
+
 			if (TargetHealthStateEnum.Healthy.equals(TargetHealthStateEnum.fromValue(targetHealth.getState()))) {
 				serviceSummary.incrementHealthyTargets();
 			}
@@ -112,22 +119,52 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 		return targetGroups;
 	}
 
-	private Map<String, ServiceSummary> createExposedServices(String... clusterNames) {
+	private Map<String, ServiceSummary> createExposedServices() {
 		List<Service> ecsServices = new LinkedList<>();
 
-		DescribeClustersRequest describeClustersRequest = new DescribeClustersRequest().withClusters(clusterNames);
-		DescribeClustersResult describeClusters = amazonEcsClient.describeClusters(describeClustersRequest);
-		describeClusters.getClusters();
-		for (Cluster cluster : describeClusters.getClusters()) {
-			String clusterName = cluster.getClusterName();
+		List<String> clusterArns = getClusterArns();
 
-			DescribeServicesRequest request = new DescribeServicesRequest();
-			request.withCluster(clusterName);
-			request.withServices(clusterNames);
-			ecsServices.addAll(amazonEcsClient.describeServices(request).getServices());
+		for (String clusterArn : clusterArns) {
+			List<Service> services = getServices(clusterArn);
+			ecsServices.addAll(services);
 		}
 
 		return ecsServices.stream().map(serviceMapper).collect(Collectors.toMap(ServiceSummary::getName, p -> p));
+	}
+
+	private List<Service> getServices(String clusterArn) {
+		List<String> serviceArns = getServicesArns(clusterArn);
+		List<Service> services = Collections.emptyList();
+
+		if (!serviceArns.isEmpty()) {
+			services = getServices(clusterArn, serviceArns);
+			
+		}
+		return services;
+	}
+
+	private List<Service> getServices(String clusterArn, List<String> serviceArns) {
+		List<Service> services;
+		DescribeServicesRequest request = new DescribeServicesRequest();
+		request.withCluster(clusterArn);
+		request.withServices(serviceArns);
+		services = amazonEcsClient.describeServices(request).getServices();
+		return services;
+	}
+
+	private List<String> getServicesArns(String clusterArn) {
+		ListServicesRequest listServicesRequest = new ListServicesRequest();
+		listServicesRequest.setCluster(clusterArn);
+
+		ListServicesResult listServices = amazonEcsClient.listServices(listServicesRequest);
+		List<String> serviceArns = listServices.getServiceArns();
+		return serviceArns;
+	}
+
+	private List<String> getClusterArns() {
+		ListClustersResult listClusters = amazonEcsClient.listClusters();
+		List<String> clusterArns = listClusters.getClusterArns();
+		return clusterArns;
 	}
 
 	private String getTagValue(List<Tag> tags, String tagKey) {

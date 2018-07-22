@@ -5,7 +5,6 @@ import java.util.Collection;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import uk.co.murraytait.awsproxy.CloudServerAdaptor;
@@ -47,7 +46,7 @@ public class ServerController {
 	}
 
 	@RequestMapping(value="/services", method = RequestMethod.GET)
-	public Collection<ServiceSummary> services(@RequestParam(value = "cluster") String[] clusterNames) throws UnknownHostException {
+	public Collection<ServiceSummary> services() throws UnknownHostException {
 
 		int tries = 0;
 		Collection<ServiceSummary> services = null;
@@ -56,7 +55,7 @@ public class ServerController {
 			tries++;
 
 			try {
-				services = serviceAdaptor.serviceSummaries(clusterNames);
+				services = serviceAdaptor.serviceSummaries();
 			} catch (UnknownHostException exception) {
 				if (tries > 4) {
 					throw exception;
