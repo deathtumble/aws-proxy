@@ -9,6 +9,7 @@ phases:
     commands:
     - echo Build started on `date`
     - echo Building the Docker image...
+    - mvn package
     - SHA1TIMESTAMP="$(date +%s | sha1sum | awk '{print substr($1,1,7)}')"
     - echo $SHA1TIMESTAMP
     - docker build -t aws-proxy:latest .
@@ -23,3 +24,4 @@ phases:
 cache:
    paths:
      - /var/lib/docker/image
+     - /root/.m2/repository
