@@ -2,8 +2,8 @@ FROM openjdk:8-jdk-alpine
 VOLUME /tmp
 
 COPY artifacts/startup-script /var/startup-script
-COPY artifacts/aws_proxy_consul.json /var/aws_proxy_consul.json
-COPY artifacts/aws_proxy_goss.yml /var/aws_proxy_goss.yml
+COPY artifacts/aws_proxy_consul.json /var/aws-proxy_consul.json
+COPY artifacts/aws_proxy_goss.yml /var/aws-proxy_goss.yml
 
 ENV AWS_ACCESS_KEY_ID ''
 ENV AWS_SECRET_ACCESS_KEY ''
@@ -19,4 +19,5 @@ VOLUME ["/etc/goss/"]
 RUN cp /var/startup-script /usr/local/bin/startup-script
 RUN chmod 774 /usr/local/bin/startup-script
 
-ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar"]
+ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
+CMD ["/usr/local/bin/startup-script"]
