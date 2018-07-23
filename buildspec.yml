@@ -11,9 +11,9 @@ phases:
     - echo Building the Docker image...
     - SHA1TIMESTAMP="$(date +%s | sha1sum | awk '{print substr($1,1,7)}')"
     - echo $SHA1TIMESTAMP
-      - docker build -t aws-proxy:latest
-      - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:$SHA1TIMESTAMP
-      - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:latest
+    - docker build -t aws-proxy:latest
+    - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:$SHA1TIMESTAMP
+    - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:latest
   post_build:
     commands:
     - echo Build completed on `date`
