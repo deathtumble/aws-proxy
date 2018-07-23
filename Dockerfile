@@ -2,8 +2,8 @@ FROM openjdk:8-jdk-alpine
 VOLUME /tmp
 
 COPY artifacts/startup-script /var/startup-script
-COPY artifacts/aws_proxy_consul.json /var/aws-proxy_consul.json
-COPY artifacts/aws_proxy_goss.yml /var/aws-proxy_goss.yml
+COPY artifacts/aws-proxy_consul.json /var/aws-proxy_consul.json
+COPY artifacts/aws-proxy_goss.yml /var/aws-proxy_goss.yml
 
 ENV AWS_ACCESS_KEY_ID ''
 ENV AWS_SECRET_ACCESS_KEY ''
