@@ -3,7 +3,7 @@ VOLUME /tmp
 
 COPY artifacts/startup-script /var/startup-script
 COPY artifacts/aws-proxy-consul.json /var/aws-proxy-consul.json
-COPY artifacts/aws-proxy-goss.yml /var/aws-proxy-goss.yml
+COPY artifacts/aws-proxy-goss.yaml /var/aws-proxy-goss.yaml
 
 ENV AWS_ACCESS_KEY_ID ''
 ENV AWS_SECRET_ACCESS_KEY ''
