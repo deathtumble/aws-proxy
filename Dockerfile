@@ -1,7 +1,7 @@
 FROM openjdk:8-jdk-alpine
 VOLUME /tmp
 
-RUN mvn package
+RUN /usr/share/maven/mvn package
 
 COPY artifacts/startup-script /var/startup-script
 COPY artifacts/aws-proxy-consul.json /var/aws-proxy-consul.json
