@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -x
+
+pid=0
+
+term_handler() {
+  rm -f /opt/consul/conf/concourse-web-consul.json
+  rm -f /etc/goss/concourse-web-goss.yaml  
+  
+  if [ $pid -ne 0 ]; then
+    kill -TERM "$pid"
+    wait "$pid"
+  fi
+  exit 143; # 128 + 15 -- TERM
+}
+
+trap 'kill ${!}; term_handler' TERM
+
+mv /var/concourse-web-consul.json /opt/consul/conf/concourse-web-consul.json
+mv /var/concourse-web-goss.yaml /etc/goss/concourse-web-goss.yaml
+
+java -Djava.security.egd=file:/dev/./urandom -jar /app.jar
+
+pid="$!"
+
+tail -f /dev/null & wait ${!}

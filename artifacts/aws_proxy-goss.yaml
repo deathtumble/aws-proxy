@@ -1,0 +1,20 @@
+file:
+  /opt/consul/conf/aws-proxy-consul.json:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+  /etc/goss/aws-proxy-goss.yaml:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+dns:
+  aws_proxy.service.consul:
+    resolvable: true
+    server: 127.0.0.1
+    timeout: 500 # in milliseconds

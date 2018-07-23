@@ -1,0 +1,22 @@
+{
+    "services": [
+        {
+            "name": "aws-proxy-sshd",
+            "port": 22,
+            "checks": [
+                {
+                    "id": "ssh22",
+                    "name": "SSH TCP on port 22",
+                    "tcp": "localhost:22",
+                    "interval": "10s",
+                    "timeout": "1s"
+                }
+            ]
+        },
+        {
+            "name": "aws_proxy",
+            "port": 8080
+        }
+    ]
+}
+
