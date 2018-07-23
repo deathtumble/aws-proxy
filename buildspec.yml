@@ -4,25 +4,22 @@ phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
-      - echo $AWS_DEFAULT_REGION
-      - $(aws ecr get-login --no-include-email --region eu-west-1)
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
   build:
     commands:
-      - echo Build started on `date`
-      - echo Building the jar file...
-      - mvn clean verify
-      - echo Building the Docker image...
-      - GITISH)" 
-      - docker build -t $IMAGE_REPO_NAME:$GITISH .
-      - docker tag $IMAGE_REPO_NAME:$GITISH $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$GITISH
-      - docker tag $IMAGE_REPO_NAME:$GITISH $IMAGE_REPO_NAME:latest
-      - docker tag $IMAGE_REPO_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest      
+    - echo Build started on `date`
+    - echo Building the Docker image...
+    - SHA1TIMESTAMP="$(date +%s | sha1sum | awk '{print substr($1,1,7)}')"
+    - echo $SHA1TIMESTAMP
+      - docker build -t aws-proxy:latest
+      - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:$SHA1TIMESTAMP
+      - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:latest
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker image...
-      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$GITISH
-      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
+    - echo Build completed on `date`
+    - echo Pushing the Docker image...
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:$SHA1TIMESTAMP
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:latest
 cache:
    paths:
      - /var/lib/docker/image
