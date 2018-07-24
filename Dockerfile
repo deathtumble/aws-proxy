@@ -1,7 +1,7 @@
 FROM openjdk:8-jdk-alpine
 VOLUME /tmp
 
-COPY bin/dumb-init /usr/local/bin/dumb-init
+COPY artifacts/dumb-init /usr/local/bin/dumb-init
 COPY artifacts/startup-script /var/startup-script
 COPY artifacts/aws-proxy-consul.json /var/aws-proxy-consul.json
 COPY artifacts/aws-proxy-goss.yaml /var/aws-proxy-goss.yaml
