@@ -4,7 +4,7 @@ set -x
 pid=0
 
 term_handler() {
-  rm -f /opt/consul/conf/aws-proxy-consul.json
+  rm -f /etc/consul/aws-proxy-consul.json
   rm -f /etc/goss/aws-proxy-goss.yaml  
   
   if [ $pid -ne 0 ]; then
@@ -16,7 +16,7 @@ term_handler() {
 
 trap 'kill ${!}; term_handler' TERM
 
-mv /var/aws-proxy-consul.json /opt/consul/conf/aws-proxy-consul.json
+mv /var/aws-proxy-consul.json /etc/consul/aws-proxy-consul.json
 mv /var/aws-proxy-goss.yaml /etc/goss/aws-proxy-goss.yaml
 
 java -Djava.security.egd=file:/dev/./urandom -jar /app.jar

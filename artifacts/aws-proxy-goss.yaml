@@ -1,5 +1,5 @@
 file:
-  /opt/consul/conf/aws-proxy-consul.json:
+  /etc/consul/aws-proxy-consul.json:
     exists: true
     mode: "0644"
     owner: root

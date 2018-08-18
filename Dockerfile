@@ -8,7 +8,7 @@ COPY artifacts/aws-proxy-goss.yaml /var/aws-proxy-goss.yaml
 
 RUN chmod 777 /usr/local/bin/* 
 
-VOLUME ["/opt/consul/conf/"]
+VOLUME ["/etc/consul/"]
 VOLUME ["/etc/goss/"]
 
 RUN cp /var/startup-script /usr/local/bin/startup-script
