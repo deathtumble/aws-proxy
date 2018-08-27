@@ -12,6 +12,7 @@ phases:
     - mvn package
     - SHA1TIMESTAMP="$(date +%s | sha1sum | awk '{print substr($1,1,7)}')"
     - echo $SHA1TIMESTAMP
+    - echo $CODEBUILD_RESOLVED_SOURCE_VERSION
     - docker build -t aws-proxy:latest .
     - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:$SHA1TIMESTAMP
     - docker tag aws-proxy:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/aws-proxy:latest
