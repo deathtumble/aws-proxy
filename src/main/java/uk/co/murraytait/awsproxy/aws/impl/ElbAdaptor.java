@@ -41,15 +41,11 @@ import uk.co.murraytait.awsproxy.model.ServiceSummary;
 @Component
 public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 
-    private static final String ENVIRONMENT_TAG_KEY = "Environment";
-    private static final String PRODUCT_TAG_KEY = "Product";
     private static final String NAME_TAG_KEY = "Name";
 
     private final AmazonElasticLoadBalancing amazonElbClient;
 
     private final AmazonECS amazonEcsClient;
-
-    private final Function<? super Service, ? extends ServiceSummary> serviceMapper;
 
     public ElbAdaptor(@Value("${aws.region}") String awsRegion) {
         super();
@@ -61,9 +57,6 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 
         amazonEcsClient = AmazonECSClientBuilder.standard().withCredentials(new DefaultAWSCredentialsProviderChain())
                 .withRegion(awsRegion).build();
-
-        serviceMapper = service -> new ServiceSummary().withName(service.getServiceName())
-                .withDesiredTasks(service.getDesiredCount()).withRunningTasks(service.getRunningCount());
     }
 
     public void destroy() throws Exception {
@@ -99,6 +92,8 @@ public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
                 .getTargetHealthDescriptions();
 
         for (TargetHealthDescription targetHealthDescription : targetHealthDescriptions) {
+            
+            serviceSummary.setTargeted();
 
             TargetHealth targetHealth = targetHealthDescription.getTargetHealth();
 

@@ -19,11 +19,14 @@ public class ServiceSummary implements Comparable<ServiceSummary> {
 	private Integer targets;
 
 	private Integer healthyTargets;
+	
+	private boolean isTargeted;
 
 	public ServiceSummary() {
 		super();
 		healthyTargets = 0;
 		targets = 0;
+		isTargeted = false;
 	}
 	
 	public void incrementHealthyTargets() {
@@ -102,7 +105,19 @@ public class ServiceSummary implements Comparable<ServiceSummary> {
 		return this;
 	}
 
-	@Override
+    public boolean isTargeted() {
+        return isTargeted;
+    }
+
+    public void setTargeted() {
+        this.isTargeted = true;
+    }
+
+    public void resetTargeted() {
+        this.isTargeted = false;
+    }
+
+    @Override
 	public int compareTo(ServiceSummary other) {
 		return new CompareToBuilder().append(this.product, other.product)
 				.append(this.environment, other.environment).append(this.name, other.name)
@@ -125,4 +140,5 @@ public class ServiceSummary implements Comparable<ServiceSummary> {
 				.append(environment, rhs.environment).append(name, rhs.name).append(desiredTasks, rhs.desiredTasks).isEquals();
 
 	}
+
 }
