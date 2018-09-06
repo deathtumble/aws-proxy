@@ -3,6 +3,7 @@ package uk.co.murraytait.awsproxy.aws.impl;
 import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -40,142 +41,154 @@ import uk.co.murraytait.awsproxy.model.ServiceSummary;
 @Component
 public class ElbAdaptor implements CloudServiceAdaptor, DisposableBean {
 
-	private static final String ENVIRONMENT_TAG_KEY = "Environment";
-	private static final String PRODUCT_TAG_KEY = "Product";
-	private static final String NAME_TAG_KEY = "Name";
+    private static final String ENVIRONMENT_TAG_KEY = "Environment";
+    private static final String PRODUCT_TAG_KEY = "Product";
+    private static final String NAME_TAG_KEY = "Name";
 
-	private final AmazonElasticLoadBalancing amazonElbClient;
+    private final AmazonElasticLoadBalancing amazonElbClient;
 
-	private final AmazonECS amazonEcsClient;
+    private final AmazonECS amazonEcsClient;
 
-	private final Function<? super Service, ? extends ServiceSummary> serviceMapper;
+    private final Function<? super Service, ? extends ServiceSummary> serviceMapper;
 
-	public ElbAdaptor(@Value("${aws.region}") String awsRegion) {
-		super();
+    public ElbAdaptor(@Value("${aws.region}") String awsRegion) {
+        super();
 
-		DefaultAWSCredentialsProviderChain credentialsProvider = new DefaultAWSCredentialsProviderChain();
+        DefaultAWSCredentialsProviderChain credentialsProvider = new DefaultAWSCredentialsProviderChain();
 
-		amazonElbClient = AmazonElasticLoadBalancingClient.builder().withCredentials(credentialsProvider)
-				.withRegion(awsRegion).build();
+        amazonElbClient = AmazonElasticLoadBalancingClient.builder().withCredentials(credentialsProvider)
+                .withRegion(awsRegion).build();
 
-		amazonEcsClient = AmazonECSClientBuilder.standard().withCredentials(new DefaultAWSCredentialsProviderChain())
-				.withRegion(awsRegion).build();
+        amazonEcsClient = AmazonECSClientBuilder.standard().withCredentials(new DefaultAWSCredentialsProviderChain())
+                .withRegion(awsRegion).build();
 
-		serviceMapper = service -> new ServiceSummary().withName(service.getServiceName())
-				.withDesiredTasks(service.getDesiredCount()).withRunningTasks(service.getRunningCount());
-	}
+        serviceMapper = service -> new ServiceSummary().withName(service.getServiceName())
+                .withDesiredTasks(service.getDesiredCount()).withRunningTasks(service.getRunningCount());
+    }
 
-	public void destroy() throws Exception {
-		amazonElbClient.shutdown();
-	}
+    public void destroy() throws Exception {
+        amazonElbClient.shutdown();
+    }
 
-	@Override
-	public Collection<ServiceSummary> serviceSummaries() throws UnknownHostException {
-		Map<String, ServiceSummary> serviceSummaryMap = createExposedServices();
+    @Override
+    public Collection<ServiceSummary> serviceSummaries() throws UnknownHostException {
+        Map<String, ServiceSummary> serviceSummaryMap = createExposedServices();
 
-		List<TargetGroup> targetGroups = getTargetGroups();
+        List<TargetGroup> targetGroups = getTargetGroups();
 
-		for (TargetGroup targetGroup : targetGroups) {
-			List<Tag> tags = amazonElbClient
-					.describeTags(new DescribeTagsRequest().withResourceArns(targetGroup.getTargetGroupArn()))
-					.getTagDescriptions().get(0).getTags();
+        for (TargetGroup targetGroup : targetGroups) {
+            List<Tag> tags = amazonElbClient
+                    .describeTags(new DescribeTagsRequest().withResourceArns(targetGroup.getTargetGroupArn()))
+                    .getTagDescriptions().get(0).getTags();
 
-			String serviceName = getTagValue(tags, NAME_TAG_KEY);
-			if (serviceSummaryMap.containsKey(serviceName)) {
-				ServiceSummary serviceSummary = serviceSummaryMap.get(serviceName);
+            String serviceName = getTagValue(tags, NAME_TAG_KEY);
+            if (serviceSummaryMap.containsKey(serviceName)) {
+                ServiceSummary serviceSummary = serviceSummaryMap.get(serviceName);
 
-				serviceSummary.setEnvironment(getTagValue(tags, ENVIRONMENT_TAG_KEY));
-				serviceSummary.setProduct(getTagValue(tags, PRODUCT_TAG_KEY));
+                addTargetGroupsHealth(targetGroup, serviceSummary);
+            }
+        }
 
-				addTargetGroupsHealth(targetGroup, serviceSummary);
-			}
-		}
+        return serviceSummaryMap.values();
+    }
 
-		return serviceSummaryMap.values();
-	}
+    private void addTargetGroupsHealth(TargetGroup targetGroup, ServiceSummary serviceSummary) {
+        List<TargetHealthDescription> targetHealthDescriptions = amazonElbClient
+                .describeTargetHealth(
+                        new DescribeTargetHealthRequest().withTargetGroupArn(targetGroup.getTargetGroupArn()))
+                .getTargetHealthDescriptions();
 
-	private void addTargetGroupsHealth(TargetGroup targetGroup, ServiceSummary serviceSummary) {
-		List<TargetHealthDescription> targetHealthDescriptions = amazonElbClient
-				.describeTargetHealth(
-						new DescribeTargetHealthRequest().withTargetGroupArn(targetGroup.getTargetGroupArn()))
-				.getTargetHealthDescriptions();
+        for (TargetHealthDescription targetHealthDescription : targetHealthDescriptions) {
 
-		for (TargetHealthDescription targetHealthDescription : targetHealthDescriptions) {
+            TargetHealth targetHealth = targetHealthDescription.getTargetHealth();
 
-			TargetHealth targetHealth = targetHealthDescription.getTargetHealth();
+            serviceSummary.incrementTargets();
 
-			serviceSummary.incrementTargets();
+            if (TargetHealthStateEnum.Healthy.equals(TargetHealthStateEnum.fromValue(targetHealth.getState()))) {
+                serviceSummary.incrementHealthyTargets();
+            }
+        }
+    }
 
-			if (TargetHealthStateEnum.Healthy.equals(TargetHealthStateEnum.fromValue(targetHealth.getState()))) {
-				serviceSummary.incrementHealthyTargets();
-			}
-		}
-	}
+    private List<TargetGroup> getTargetGroups() {
+        DescribeTargetGroupsRequest request = new DescribeTargetGroupsRequest();
+        DescribeTargetGroupsResult describeTargetGroups = amazonElbClient.describeTargetGroups(request);
+        List<TargetGroup> targetGroups = describeTargetGroups.getTargetGroups();
+        return targetGroups;
+    }
 
-	private List<TargetGroup> getTargetGroups() {
-		DescribeTargetGroupsRequest request = new DescribeTargetGroupsRequest();
-		DescribeTargetGroupsResult describeTargetGroups = amazonElbClient.describeTargetGroups(request);
-		List<TargetGroup> targetGroups = describeTargetGroups.getTargetGroups();
-		return targetGroups;
-	}
+    private Map<String, ServiceSummary> createExposedServices() {
+        List<Service> ecsServices = new LinkedList<>();
 
-	private Map<String, ServiceSummary> createExposedServices() {
-		List<Service> ecsServices = new LinkedList<>();
+        List<String> clusterArns = getClusterArns();
+        
+        Map<String, ServiceSummary> serviceSummaries = new HashMap<>();
 
-		List<String> clusterArns = getClusterArns();
+        for (String clusterArn : clusterArns) {
+            List<Service> services = getServices(clusterArn);
+            ecsServices.addAll(services);
 
-		for (String clusterArn : clusterArns) {
-			List<Service> services = getServices(clusterArn);
-			ecsServices.addAll(services);
-		}
+            for (Service service : services) {
+                String serviceName = service.getServiceName();
+                
+                ServiceSummary serviceSummary = new ServiceSummary().withName(serviceName)
+                        .withDesiredTasks(service.getDesiredCount()).withRunningTasks(service.getRunningCount());
+                
+                String environment = serviceName.substring(serviceName.lastIndexOf("-") + 1); 
+                
+                serviceSummary.setEnvironment(environment);
+                
+                serviceSummaries.put(serviceSummary.getName(), serviceSummary);
+            }
+        }
+        
+        return serviceSummaries;
+    }
 
-		return ecsServices.stream().map(serviceMapper).collect(Collectors.toMap(ServiceSummary::getName, p -> p));
-	}
+    private List<Service> getServices(String clusterArn) {
+        List<String> serviceArns = getServicesArns(clusterArn);
+        List<Service> services = Collections.emptyList();
 
-	private List<Service> getServices(String clusterArn) {
-		List<String> serviceArns = getServicesArns(clusterArn);
-		List<Service> services = Collections.emptyList();
+        if (!serviceArns.isEmpty()) {
+            services = getServices(clusterArn, serviceArns);
 
-		if (!serviceArns.isEmpty()) {
-			services = getServices(clusterArn, serviceArns);
-			
-		}
-		return services;
-	}
+        }
+        return services;
+    }
 
-	private List<Service> getServices(String clusterArn, List<String> serviceArns) {
-		List<Service> services;
-		DescribeServicesRequest request = new DescribeServicesRequest();
-		request.withCluster(clusterArn);
-		request.withServices(serviceArns);
-		services = amazonEcsClient.describeServices(request).getServices();
-		return services;
-	}
+    private List<Service> getServices(String clusterArn, List<String> serviceArns) {
+        List<Service> services;
+        DescribeServicesRequest request = new DescribeServicesRequest();
+        request.withCluster(clusterArn);
+        request.withServices(serviceArns);
+        services = amazonEcsClient.describeServices(request).getServices();
+        return services;
+    }
 
-	private List<String> getServicesArns(String clusterArn) {
-		ListServicesRequest listServicesRequest = new ListServicesRequest();
-		listServicesRequest.setCluster(clusterArn);
+    private List<String> getServicesArns(String clusterArn) {
+        ListServicesRequest listServicesRequest = new ListServicesRequest();
+        listServicesRequest.setCluster(clusterArn);
 
-		ListServicesResult listServices = amazonEcsClient.listServices(listServicesRequest);
-		List<String> serviceArns = listServices.getServiceArns();
-		return serviceArns;
-	}
+        ListServicesResult listServices = amazonEcsClient.listServices(listServicesRequest);
+        List<String> serviceArns = listServices.getServiceArns();
+        return serviceArns;
+    }
 
-	private List<String> getClusterArns() {
-		ListClustersResult listClusters = amazonEcsClient.listClusters();
-		List<String> clusterArns = listClusters.getClusterArns();
-		return clusterArns;
-	}
+    private List<String> getClusterArns() {
+        ListClustersResult listClusters = amazonEcsClient.listClusters();
+        List<String> clusterArns = listClusters.getClusterArns();
+        return clusterArns;
+    }
 
-	private String getTagValue(List<Tag> tags, String tagKey) {
-		Optional<Tag> foundTag = tags.stream().filter(tag -> {
-			return tag.getKey().equals(tagKey);
-		}).findFirst();
+    private String getTagValue(List<Tag> tags, String tagKey) {
+        Optional<Tag> foundTag = tags.stream().filter(tag -> {
+            return tag.getKey().equals(tagKey);
+        }).findFirst();
 
-		if (foundTag.isPresent()) {
-			return foundTag.get().getValue();
-		} else {
-			return "";
-		}
-	}
+        if (foundTag.isPresent()) {
+            return foundTag.get().getValue();
+        } else {
+            return "";
+        }
+    }
 }
