@@ -105,7 +105,7 @@ public class ServiceSummary implements Comparable<ServiceSummary> {
 		return this;
 	}
 
-    public boolean isTargeted() {
+    public boolean getTargeted() {
         return isTargeted;
     }
 
