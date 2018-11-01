@@ -9,18 +9,21 @@ term_handler() {
   
   if [ $pid -ne 0 ]; then
     kill -TERM "$pid"
-    wait "$pid"
   fi
   exit 143; # 128 + 15 -- TERM
 }
 
-trap 'kill ${!}; term_handler' TERM
+trap 'term_handler' TERM
 
 mv /var/aws-proxy-consul.json /etc/consul/aws-proxy-consul.json
 mv /var/aws-proxy-goss.yaml /etc/goss/aws-proxy-goss.yaml
 
-java -Djava.security.egd=file:/dev/./urandom -jar /app.jar
+java -Djava.security.egd=file:/dev/./urandom -jar /app.jar &
 
 pid="$!"
 
-tail -f /dev/null & wait ${!}
+echo pid="$pid" 
+
+wait $pid
+trap - TERM
+wait $pid
